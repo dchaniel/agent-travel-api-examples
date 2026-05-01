@@ -32,7 +32,7 @@ Current responses use seeded travel intelligence. This is not live booking inven
 
 ```bash
 curl https://agentinfrastructureco.com/api/v1/travel/search \
-  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Authorization: Bearer AGENT_TRAVEL_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "origin": "SFO",
