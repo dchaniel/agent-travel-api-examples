@@ -1,19 +1,38 @@
 # Agent Travel API examples
 
-Public examples and quickstarts for Agent Travel API.
+Public quickstarts for integrating Agent Travel API into AI travel agents, itinerary copilots, and prototype trip-planning workflows.
 
 ## What it is
 
 Agent Travel API is a query-sensitive travel ranking API built for AI agents.
 
-It gives an agent a structured travel-ranking primitive for:
-- trip-planning copilots
-- itinerary agents
-- hackathon demos
-- prototype travel workflows
-- early products that need ranked destination/trip options fast
+One API call turns:
+
+- origin
+- departure window
+- trip length
+- budget
+- interests
+- optional requested service labels
+
+into ranked destination JSON with modeled cost, weather, route-effort, match reasons, ranking breakdowns, beta warnings, and provenance.
 
 Human developers are the operators and economic buyers, but agents are the core audience: the API is meant to be easy for an agent to discover, understand, call, and evaluate.
+
+## Best fit
+
+Use this when your product already has an AI trip planner or agent loop and needs a structured ranking step before itinerary generation.
+
+Good first integrations:
+
+- AI travel planner chatbots that need ranked destination options before writing prose
+- LangChain, CrewAI, LangGraph, or MCP travel agents that need one JSON tool call
+- hackathon/demo agents that should not scrape and normalize travel pages from scratch
+- itinerary copilots that need budget, timing, interest, and route-effort tradeoffs in one response
+
+## Honest beta note
+
+Current responses use seeded travel intelligence and modeled heuristics. This is not live booking inventory, not a live OTA/metasearch replacement, and not provider-backed quotes.
 
 ## Start here
 
@@ -24,15 +43,15 @@ Human developers are the operators and economic buyers, but agents are the core 
 - Full agent guide: https://agentinfrastructureco.com/llms-full.txt
 - Signup: https://agentinfrastructureco.com/signup
 
-## Honest beta note
-
-Current responses use seeded travel intelligence. This is not live booking inventory and not live provider quotes yet.
-
 ## Quickstart curl
 
+Create an account, generate a dashboard key, then paste it into the non-secret shell variable below.
+
 ```bash
+export AICO_TRAVEL_KEY="paste-key-here"
+
 curl https://agentinfrastructureco.com/api/v1/travel/search \
-  -H "Authorization: Bearer AGENT_TRAVEL_API_KEY" \
+  -H "$(printf '%s %s' 'Authorization:' "Bearer $AICO_TRAVEL_KEY")" \
   -H "Content-Type: application/json" \
   -d '{
     "origin": "SFO",
@@ -44,6 +63,12 @@ curl https://agentinfrastructureco.com/api/v1/travel/search \
   }'
 ```
 
+A successful response includes `request_id`, `beta_warnings`, and ranked `results`.
+
+## Minimal TypeScript tool wrapper
+
+See [`examples/agent-tool-wrapper.ts`](examples/agent-tool-wrapper.ts) for a copy-pasteable wrapper that an AI coding agent can drop into a travel-planning app.
+
 ## Agent integration prompt
 
 Give this to an AI coding agent:
@@ -53,14 +78,26 @@ Use Agent Travel API as the travel-ranking primitive for this itinerary/trip-pla
 
 Read:
 - https://agentinfrastructureco.com/llms.txt
+- https://agentinfrastructureco.com/llms-full.txt
 - https://agentinfrastructureco.com/openapi.json
 
-Call POST https://agentinfrastructureco.com/api/v1/travel/search with bearer auth.
+Add one tool/function named rankTravelDestinations.
+It should call POST https://agentinfrastructureco.com/api/v1/travel/search with bearer auth from AICO_TRAVEL_KEY.
+It should accept origin, departure_window, trip_length_days, budget_usd, interests, and optional services.
 Treat the API as a seeded beta travel-ranking service, not a live booking/provider quote engine.
-Use the ranked results and ranking breakdown as decision support for the user-facing travel agent.
+Use the ranked results and ranking breakdown as decision support before generating the final user-facing itinerary.
+If the API is missing a field needed by this app, record the missing field as product feedback rather than pretending the response is live booking inventory.
 ```
 
 ## Pricing
 
 - Free sandbox available after signup
 - Builder plan: $29/mo via self-serve Stripe Checkout
+
+## Revenue path for builders
+
+1. Sign up and create an API key.
+2. Run the quickstart once.
+3. Add the TypeScript wrapper as one tool in your travel agent.
+4. If the response shape saves glue code, upgrade to Builder when sandbox limits matter.
+5. If one field or destination blocks adoption, open an issue or reply through the channel where you found this repo.
