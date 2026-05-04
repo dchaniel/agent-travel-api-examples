@@ -7,6 +7,34 @@ type RankTravelInput = {
   services?: string[];
 };
 
+type Confidence = {
+  level: "low" | "medium" | "high" | string;
+  score: number;
+  reasons: string[];
+};
+
+type LiveSignalCandidate = {
+  name: string;
+  source: string;
+  maps_url?: string;
+  latitude?: number;
+  longitude?: number;
+};
+
+type LiveSignals = {
+  status: "live" | "degraded" | "unavailable" | string;
+  source: string;
+  retrieved_at?: string;
+  hotel_candidates: LiveSignalCandidate[];
+  coverage: {
+    live_hotel_listings: boolean;
+    live_booking_inventory: boolean;
+    provider_backed_rates: boolean;
+    live_flight_fares: boolean;
+  };
+  limitations: string[];
+};
+
 type AgentTravelResult = {
   id: string;
   name: string;
@@ -14,6 +42,11 @@ type AgentTravelResult = {
   trip_style?: string;
   total_trip_estimate_usd: number;
   ranking_breakdown: Record<string, number>;
+  confidence: Confidence;
+  unsupported_constraints: string[];
+  why_not_bookable_yet: string;
+  intelligence_basis: string[];
+  live_signals?: LiveSignals;
   match_reasons: string[];
   beta_warnings?: string[];
   provenance?: {
@@ -52,6 +85,40 @@ export async function rankTravelDestinations(input: RankTravelInput): Promise<Ag
   return (await response.json()) as AgentTravelResponse;
 }
 
+export function summarizeForPlanner(response: AgentTravelResponse) {
+  const top = response.results[0];
+
+  if (!top) {
+    return {
+      requestId: response.request_id,
+      decision: "ask_for_more_constraints",
+      summary: "No ranked destination returned; ask the user for clearer dates, budget, origin, or interests.",
+    };
+  }
+
+  const coverage = top.live_signals?.coverage;
+  const needsLiveProviderHandoff = Boolean(
+    coverage &&
+      (!coverage.live_booking_inventory || !coverage.provider_backed_rates || !coverage.live_flight_fares),
+  );
+
+  return {
+    requestId: response.request_id,
+    decision: "use_ranked_destination_as_planning_start",
+    topDestination: top.name,
+    confidence: top.confidence,
+    unsupportedConstraints: top.unsupported_constraints,
+    intelligenceBasis: top.intelligence_basis,
+    liveSignalsSource: top.live_signals?.source,
+    needsLiveProviderHandoff,
+    summary: [
+      `Start itinerary generation from ${top.name}; score ${top.score}.`,
+      `Reasons: ${top.match_reasons.join(" | ")}`,
+      top.why_not_bookable_yet,
+    ].join(" "),
+  };
+}
+
 // Example usage inside an AI trip-planning copilot.
 async function example() {
   const ranked = await rankTravelDestinations({
@@ -63,15 +130,7 @@ async function example() {
     services: ["flights", "stays", "weather", "research"],
   });
 
-  const top = ranked.results[0];
-
-  return {
-    requestId: ranked.request_id,
-    betaWarnings: ranked.beta_warnings,
-    recommendationForPlanner: top
-      ? `Start itinerary generation from ${top.name}; score ${top.score}; reasons: ${top.match_reasons.join(" | ")}`
-      : "No ranked destination returned; ask user for clearer dates, budget, origin, or interests.",
-  };
+  return summarizeForPlanner(ranked);
 }
 
 void example;

@@ -15,7 +15,7 @@ One API call turns:
 - interests
 - optional requested service labels
 
-into ranked destination JSON with modeled cost, weather, route-effort, match reasons, ranking breakdowns, beta warnings, and provenance.
+into ranked destination JSON with modeled cost, weather, route-effort, match reasons, ranking breakdowns, beta warnings, confidence, unsupported constraints, provenance, and live hotel/place discovery signals.
 
 Human developers are the operators and economic buyers, but agents are the core audience: the API is meant to be easy for an agent to discover, understand, call, and evaluate.
 
@@ -28,17 +28,19 @@ Good first integrations:
 - AI travel planner chatbots that need ranked destination options before writing prose
 - LangChain, CrewAI, LangGraph, or MCP travel agents that need one JSON tool call
 - hackathon/demo agents that should not scrape and normalize travel pages from scratch
-- itinerary copilots that need budget, timing, interest, and route-effort tradeoffs in one response
+- itinerary copilots that need budget, timing, interest, live hotel/place discovery signals, and route-effort tradeoffs in one response
 
 ## Honest beta note
 
-Current responses use seeded travel intelligence and modeled heuristics. This is not live booking inventory, not a live OTA/metasearch replacement, and not provider-backed quotes.
+Current responses combine seeded/modelled destination intelligence with live hotel/place discovery signals when available. This is not live booking inventory, not a live OTA/metasearch replacement, not live flight fares, and not provider-backed rates or quotes.
 
 ## Start here
 
 - Product: https://agentinfrastructureco.com/travel
 - Docs: https://agentinfrastructureco.com/docs
 - OpenAPI: https://agentinfrastructureco.com/openapi.json
+- Hosted MCP: https://agentinfrastructureco.com/mcp
+- CLI: https://agentinfrastructureco.com/cli
 - llms.txt: https://agentinfrastructureco.com/llms.txt
 - Full agent guide: https://agentinfrastructureco.com/llms-full.txt
 - Signup: https://agentinfrastructureco.com/signup
@@ -65,9 +67,20 @@ curl https://agentinfrastructureco.com/api/v1/travel/search \
 
 A successful response includes `request_id`, `beta_warnings`, and ranked `results`.
 
+Each result exposes trust fields an agent should inspect before writing user-facing travel advice:
+
+- `confidence`: level, score, and reasons for the ranking confidence
+- `unsupported_constraints`: constraints the beta could not fully verify
+- `why_not_bookable_yet`: why this is not ready to transact without live providers
+- `intelligence_basis`: what seeded/modelled basis drove the result
+- `live_signals`: source, retrieval time, hotel/place candidates, coverage flags, and limitations
+- `provenance`: source notes; current beta remains explicit that it is not provider-backed quotes
+
 ## Minimal TypeScript tool wrapper
 
 See [`examples/agent-tool-wrapper.ts`](examples/agent-tool-wrapper.ts) for a copy-pasteable wrapper that an AI coding agent can drop into a travel-planning app.
+
+The wrapper intentionally returns the beta trust fields, not only the destination name and score. Agents should read `confidence`, `unsupported_constraints`, `why_not_bookable_yet`, and `live_signals.coverage` before deciding whether to ask a booking/search provider for live inventory.
 
 ## Agent integration prompt
 
@@ -80,12 +93,15 @@ Read:
 - https://agentinfrastructureco.com/llms.txt
 - https://agentinfrastructureco.com/llms-full.txt
 - https://agentinfrastructureco.com/openapi.json
+- https://agentinfrastructureco.com/mcp
+- https://agentinfrastructureco.com/cli
 
 Add one tool/function named rankTravelDestinations.
-It should call POST https://agentinfrastructureco.com/api/v1/travel/search with bearer auth from AICO_TRAVEL_KEY.
+It should call POST https://agentinfrastructureco.com/api/v1/travel/search with bearer auth from AICO_TRAVEL_KEY, or call the hosted MCP tool rank_travel_destinations when the runtime prefers MCP-style tools.
 It should accept origin, departure_window, trip_length_days, budget_usd, interests, and optional services.
-Treat the API as a seeded beta travel-ranking service, not a live booking/provider quote engine.
-Use the ranked results and ranking breakdown as decision support before generating the final user-facing itinerary.
+Treat the API as seeded/modelled destination ranking plus live hotel/place discovery signals, not booking inventory, live flight fares, provider-backed rates, or provider-backed quotes.
+Inspect confidence, unsupported_constraints, why_not_bookable_yet, intelligence_basis, and live_signals before generating final user-facing recommendations.
+Use ranked results and ranking breakdowns as decision support before itinerary generation.
 If the API is missing a field needed by this app, record the missing field as product feedback rather than pretending the response is live booking inventory.
 ```
 
