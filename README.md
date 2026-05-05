@@ -108,7 +108,7 @@ Validated primitive proof chain: `activation → travel.intent.parse → travel.
 4. `travel.plan.validate` checks the selected candidate/proposed plan for candidate/date/season/theme coherence and unsupported live booking/rate/fare claims.
 5. `travel.provider_handoffs.generate` prepares provider-ready flight/hotel/place validation tasks only after the candidate passes validation.
 
-The current eval proof selects `Point Reyes + Sonoma Coast` for a broad autumn SFO hiking/food request, inspects live-places evidence, reports `candidate_intent_coherence.status: coherent`, preserves false live airfare / live booking inventory / provider-backed rates boundaries, and marks Builder as worth testing.
+The current eval proof selects `Point Reyes + Sonoma Coast` for a broad autumn SFO hiking/food request, inspects live-places evidence, reports `candidate_intent_coherence.status: coherent`, preserves `live_flight_fares: false`, `live_booking_inventory: false`, and `provider_backed_rates: false`, and marks Builder as worth testing.
 
 Minimal `travel.plan.validate` JSON-RPC shape:
 
@@ -169,7 +169,7 @@ JSON-RPC shape:
 }
 ```
 
-Expected handoff fields: `bookability_status: "handoff_required"`, `provider_handoffs.flight_handoff`, `provider_handoffs.hotel_handoff`, `provider_handoffs.place_handoff`, `required_external_checks`, and `truth_boundaries` with live airfare, live booking inventory, and provider-backed rates still false. This primitive is useful before provider fanout; it is not a fare, room, rate, or booking validation result.
+Expected handoff fields: `bookability_status: "handoff_required"`, `provider_handoffs.flight_handoff`, `provider_handoffs.hotel_handoff`, `provider_handoffs.place_handoff`, `required_external_checks`, and `truth_boundaries` with `live_flight_fares: false`, `live_booking_inventory: false`, and `provider_backed_rates: false`. This primitive is useful before provider fanout; it is not a fare, room, rate, or booking validation result.
 
 ## Agent integration prompt
 

@@ -29,7 +29,7 @@ Add MCP primitive wrappers when the planner already has live provider integratio
 Run the primitive proof chain before provider fanout:
 activation → travel.intent.parse → travel.destinations.search → travel.places.search → travel.plan.validate → travel.provider_handoffs.generate.
 
-The current public proof validates Point Reyes + Sonoma Coast for an autumn SFO hiking/food prompt. It should inspect live_places evidence, assert plan_validation.candidate_intent_coherence before provider fanout, then execute provider_handoffs only for coherent candidates.
+The current public proof validates Point Reyes + Sonoma Coast for an autumn SFO hiking/food prompt. It should inspect live_places evidence, assert plan_validation.candidate_intent_coherence before provider fanout, then execute provider_handoffs only for coherent candidates while preserving live_flight_fares: false, live_booking_inventory: false, and provider_backed_rates: false.
 
 Treat the API as source-tiered destination search/validation plus live place discovery signals where available. It is not booking inventory, live flight fares, provider-backed hotel rates, room availability, provider-backed quotes, taxes/fees validation, checkout availability, or a booking rail.
 
