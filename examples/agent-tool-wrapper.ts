@@ -213,6 +213,36 @@ type LivePlacesPrimitiveResponse = {
   };
 };
 
+type IntentParsePrimitiveResponse = {
+  beta_caveat?: string;
+  effective_input?: Record<string, unknown>;
+  interpreted_constraints?: Record<string, unknown>;
+  constraint_conflicts?: Array<Record<string, unknown>>;
+  beta_warnings?: string[];
+  missing_fields?: string[];
+};
+
+type DestinationSearchPrimitiveResponse = {
+  beta_caveat?: string;
+  match_status: { status: "matched" | "no_match" | string; reason?: string };
+  interpreted_constraints?: Record<string, unknown>;
+  constraint_conflicts?: Array<Record<string, unknown>>;
+  candidate_destinations: Array<{
+    id: string;
+    name: string;
+    source_tiers?: string[];
+    eligibility_reasons?: string[];
+    bookability_status?: "handoff_required" | "not_bookable" | string;
+  }>;
+  truth_boundaries: {
+    live_airfare?: false;
+    live_booking_inventory: false;
+    provider_backed_rates: false;
+    booking_supported?: false;
+  };
+  next_step?: string;
+};
+
 export async function searchTravelDestinations(input: SearchTravelInput): Promise<AgentTravelResponse> {
   const key = process.env.AICO_TRAVEL_KEY;
 
@@ -320,6 +350,28 @@ async function callHostedMcpTool<TResponse>(name: string, input: object, id: str
   }
 
   return result as TResponse;
+}
+
+export async function parseTravelIntent(input: SearchTravelInput): Promise<IntentParsePrimitiveResponse> {
+  if (!input.user_request) {
+    throw new Error("travel.intent.parse requires user_request so hard constraints are interpreted from the real prompt.");
+  }
+
+  return callHostedMcpTool<IntentParsePrimitiveResponse>("travel.intent.parse", input, "intent-parse-1");
+}
+
+export async function searchCandidateDestinations(
+  input: SearchTravelInput,
+): Promise<DestinationSearchPrimitiveResponse> {
+  if (!input.user_request) {
+    throw new Error("travel.destinations.search requires user_request so destination gating preserves the user's hard scope.");
+  }
+
+  return callHostedMcpTool<DestinationSearchPrimitiveResponse>(
+    "travel.destinations.search",
+    input,
+    "destinations-search-1",
+  );
 }
 
 export async function searchLivePlaces(
@@ -433,4 +485,61 @@ async function example() {
   return summarizeForPlanner(ranked);
 }
 
+// Example primitive-chain usage for provider-fanout planners.
+async function examplePrimitiveChain() {
+  const input: SearchTravelInput = {
+    user_request:
+      "Find a 5-day autumn hiking and food trip from SFO under $4,500 before Amadeus, Hotelbeds, and Google Places fanout.",
+    origin: "SFO",
+    departure_window: ["2026-10-01", "2026-10-06"],
+    trip_length_days: 5,
+    budget_usd: 4500,
+    interests: ["hiking", "food"],
+    services: ["flights", "stays", "research"],
+    strict_mode: true,
+  };
+
+  const intent = await parseTravelIntent(input);
+  const destinations = await searchCandidateDestinations(input);
+  const selected = destinations.candidate_destinations.find(
+    (candidate) => candidate.id === "point-reyes-sonoma-coast" || candidate.name === "Point Reyes + Sonoma Coast",
+  );
+
+  if (!selected || destinations.match_status.status !== "matched") {
+    return {
+      intent,
+      destinations,
+      decision: "route_to_live_search_or_ask_for_more_constraints_before_provider_fanout",
+    };
+  }
+
+  const livePlaces = await searchLivePlaces({
+    ...input,
+    user_request:
+      "Find live-place evidence for the selected Point Reyes + Sonoma Coast autumn hiking and food candidate before live provider fanout.",
+    selected_candidate: { id: selected.id, name: selected.name },
+  });
+
+  const validation = await validateTravelPlan({
+    ...input,
+    user_request: "Validate a 5-day autumn hiking and food trip from SFO under $4,500 before live provider fanout.",
+    proposed_plan: {
+      candidate_id: selected.id,
+      destination_name: selected.name,
+      departure_window: input.departure_window,
+      trip_length_days: input.trip_length_days,
+      themes: input.interests,
+      claims: [],
+    },
+  });
+
+  if (validation.plan_validation.candidate_intent_coherence.status !== "coherent") {
+    return { intent, destinations, livePlaces, validation, decision: "revise_candidate_before_provider_fanout" };
+  }
+
+  const handoffs = await generateProviderHandoffs(input);
+  return { intent, destinations, livePlaces, validation, handoffs, decision: "execute_provider_handoffs" };
+}
+
 void example;
+void examplePrimitiveChain;

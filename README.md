@@ -173,7 +173,7 @@ Expected handoff fields: `bookability_status: "handoff_required"`, `provider_han
 
 ## Agent integration prompt
 
-Give this to an AI coding agent:
+A standalone copy lives at [`prompts/agent-integration-prompt.md`](prompts/agent-integration-prompt.md). Give this to an AI coding agent:
 
 ```text
 Use Agent Travel API as the travel search/validation primitive for this itinerary/trip-planning flow.
