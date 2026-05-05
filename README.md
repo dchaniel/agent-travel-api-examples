@@ -6,7 +6,7 @@ Public quickstarts for integrating Agent Travel API into AI travel agents, itine
 
 Agent Travel API is an agent-native travel search and validation API built for AI agents.
 
-One API call turns a messy trip prompt plus optional hard constraints into source-aware destination JSON with interpreted constraints, conflict handling, ranking breakdowns, beta warnings, confidence, unsupported constraints, provenance, live hotel/place discovery signals where available, and provider-ready handoffs.
+One API call turns a messy trip prompt plus optional hard constraints into source-aware destination JSON with interpreted constraints, conflict handling, ranking breakdowns, beta warnings, confidence, unsupported constraints, provenance, live hotel/place discovery signals where available, and provider-ready handoffs. Hosted MCP also exposes composable primitives such as `travel.intent.parse` and `travel.provider_handoffs.generate` for agents that need parsing or handoff setup without a ranked itinerary response.
 
 Human developers are the operators and economic buyers, but agents are the core audience: the API is meant to be easy for an agent to discover, understand, activate, call, and evaluate.
 
@@ -91,9 +91,38 @@ Each result exposes trust fields an agent should inspect before writing user-fac
 
 ## Minimal TypeScript tool wrapper
 
-See [`examples/agent-tool-wrapper.ts`](examples/agent-tool-wrapper.ts) for a copy-pasteable wrapper that an AI coding agent can drop into a travel-planning app.
+See [`examples/agent-tool-wrapper.ts`](examples/agent-tool-wrapper.ts) for copy-pasteable wrappers that an AI coding agent can drop into a travel-planning app.
 
 The wrapper intentionally returns the trust and handoff fields, not only the destination name and score. Agents should read `interpreted_constraints`, `confidence`, `unsupported_constraints`, `booking_readiness`, `bookability_status`, `provider_handoffs`, and `live_signals.coverage` before deciding whether to ask a booking/search provider for live inventory.
+
+## Hosted MCP primitive: provider handoff only
+
+If your planner already has Amadeus, Booking, Google Places, Browserless, Serper, or another live provider layer, use the hosted MCP tool `travel.provider_handoffs.generate` when you want provider-ready setup without ranked destinations.
+
+JSON-RPC shape:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "travel.provider_handoffs.generate",
+    "arguments": {
+      "user_request": "Generate provider-ready flight, hotel, and place handoffs for a 5-day SFO hiking and food trip under $4,500 before live provider fanout.",
+      "origin": "SFO",
+      "departure_window": ["2026-10-01", "2026-10-06"],
+      "trip_length_days": 5,
+      "budget_usd": 4500,
+      "interests": ["hiking", "food"],
+      "services": ["flights", "stays", "research"],
+      "strict_mode": true
+    }
+  }
+}
+```
+
+Expected handoff fields: `bookability_status: "handoff_required"`, `provider_handoffs.flight_handoff`, `provider_handoffs.hotel_handoff`, `provider_handoffs.place_handoff`, `required_external_checks`, and `truth_boundaries` with live airfare, live booking inventory, and provider-backed rates still false. This primitive is useful before provider fanout; it is not a fare, room, rate, or booking validation result.
 
 ## Agent integration prompt
 
@@ -109,8 +138,9 @@ Read:
 - https://agentinfrastructureco.com/mcp
 - https://agentinfrastructureco.com/cli
 
-Add one tool/function named searchTravelDestinations.
-It should call POST https://agentinfrastructureco.com/api/v1/travel/search with bearer auth from AICO_TRAVEL_KEY, or call the hosted MCP tool rank_travel_destinations when the runtime prefers MCP-style tools.
+Add one REST tool/function named searchTravelDestinations for ranked destination search.
+It should call POST https://agentinfrastructureco.com/api/v1/travel/search with bearer auth from AICO_TRAVEL_KEY, or call the hosted MCP tool rank_travel_destinations when the runtime prefers MCP-style ranked tools.
+Add a second MCP-only primitive named generateProviderHandoffs when the planner already has live provider integrations and only needs setup for downstream validation. It should call the hosted MCP tool `travel.provider_handoffs.generate`, require user_request, and return handoff fields without ranked destinations.
 It should accept user_request, origin, departure_window, trip_length_days, budget_usd, destination_constraints, required_themes, strict_mode, interests, and optional services.
 Treat the API as source-tiered destination search/validation plus live hotel/place discovery signals where available, not booking inventory, live flight fares, provider-backed rates, room availability, provider-backed quotes, or booking rails.
 Inspect interpreted_constraints, constraint_conflicts, confidence, unsupported_constraints, booking_readiness, bookability_status, provider_handoffs, provenance/source_tiers, and live_signals before generating final user-facing recommendations.

@@ -97,6 +97,24 @@ type AgentTravelResponse = {
   results: AgentTravelResult[];
 };
 
+type ProviderHandoffPrimitiveResponse = {
+  beta_caveat?: string;
+  interpreted_constraints?: Record<string, unknown>;
+  constraint_conflicts?: Array<Record<string, unknown>>;
+  match_status?: { status: "matched" | "no_match" | string; reason?: string };
+  selected_candidate?: { id: string; name: string; source_tiers?: string[] };
+  bookability_status: "handoff_required" | "not_bookable" | "provider_live_partial" | "provider_live_verified" | string;
+  provider_handoffs: ProviderHandoffs;
+  required_external_checks: string[];
+  truth_boundaries: {
+    live_airfare: false;
+    live_booking_inventory: false;
+    provider_backed_rates: false;
+    booking_supported?: false;
+  };
+  next_step?: string;
+};
+
 export async function searchTravelDestinations(input: SearchTravelInput): Promise<AgentTravelResponse> {
   const key = process.env.AICO_TRAVEL_KEY;
 
@@ -118,6 +136,55 @@ export async function searchTravelDestinations(input: SearchTravelInput): Promis
   }
 
   return (await response.json()) as AgentTravelResponse;
+}
+
+export async function generateProviderHandoffs(input: SearchTravelInput): Promise<ProviderHandoffPrimitiveResponse> {
+  const key = process.env.AICO_TRAVEL_KEY;
+
+  if (!key) {
+    throw new Error("Set AICO_TRAVEL_KEY to a dashboard or activation API key before calling Agent Travel API MCP.");
+  }
+
+  if (!input.user_request) {
+    throw new Error("travel.provider_handoffs.generate requires user_request so handoff setup preserves the user's hard scope.");
+  }
+
+  const response = await fetch("https://agentinfrastructureco.com/mcp", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: ["Bearer", key].join(" "),
+    },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: "provider-handoffs-1",
+      method: "tools/call",
+      params: {
+        name: "travel.provider_handoffs.generate",
+        arguments: input,
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Agent Travel API MCP returned ${response.status}: ${await response.text()}`);
+  }
+
+  const envelope = (await response.json()) as {
+    result?: { content?: Array<{ type: string; text?: string }> };
+    error?: { message?: string };
+  };
+
+  if (envelope.error) {
+    throw new Error(envelope.error.message ?? "Agent Travel API MCP returned an error.");
+  }
+
+  const text = envelope.result?.content?.find((item) => item.type === "text")?.text;
+  if (!text) {
+    throw new Error("Agent Travel API MCP returned no text payload for provider handoffs.");
+  }
+
+  return JSON.parse(text) as ProviderHandoffPrimitiveResponse;
 }
 
 export function summarizeForPlanner(response: AgentTravelResponse) {
