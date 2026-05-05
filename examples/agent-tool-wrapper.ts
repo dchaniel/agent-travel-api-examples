@@ -115,6 +115,31 @@ type CommercialNextStep = {
   };
 };
 
+type CommercialIntentResponse = {
+  commercial_intent_id: string;
+  event: "commercial_intent_requested";
+  request_id: string;
+  source_path: "/api/v1/travel/search/commercial-next-step" | string;
+  requires_browser_billing_account: true;
+  billing_bridge: {
+    status: "browser_billing_account_required" | string;
+    paid_signup_url: string;
+    paid_login_url: string;
+    billing_url_after_login: string;
+  };
+  next_action: {
+    type: "open_browser_authenticated_billing" | string;
+    signup_url: string;
+    login_url: string;
+  };
+  truth_boundaries: {
+    live_booking_inventory: false;
+    provider_backed_rates: false;
+    live_flight_fares: false;
+    booking_supported: false;
+  };
+};
+
 type ProviderHandoffPrimitiveResponse = {
   beta_caveat?: string;
   interpreted_constraints?: Record<string, unknown>;
@@ -209,6 +234,39 @@ export async function searchTravelDestinations(input: SearchTravelInput): Promis
   }
 
   return (await response.json()) as AgentTravelResponse;
+}
+
+export async function recordCommercialIntent(
+  requestId: string,
+  sourcePath = "/api/v1/travel/search/commercial-next-step",
+): Promise<CommercialIntentResponse> {
+  const key = process.env.AICO_TRAVEL_KEY;
+
+  if (!key) {
+    throw new Error("Set AICO_TRAVEL_KEY before recording Agent Travel API commercial intent.");
+  }
+
+  const response = await fetch("https://agentinfrastructureco.com/api/v1/commercial/intent", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: ["Bearer", key].join(" "),
+    },
+    body: JSON.stringify({
+      request_id: requestId,
+      source_path: sourcePath,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Agent Travel API commercial intent returned ${response.status}: ${await response.text()}`);
+  }
+
+  const body = (await response.json()) as CommercialIntentResponse;
+  if (body.requires_browser_billing_account !== true) {
+    throw new Error("Unexpected commercial intent response: expected browser-authenticated billing boundary.");
+  }
+  return body;
 }
 
 async function callHostedMcpTool<TResponse>(name: string, input: object, id: string): Promise<TResponse> {
@@ -337,6 +395,9 @@ export function summarizeForPlanner(response: AgentTravelResponse) {
           paidSignupUrl: response.commercial_next_step.paid_signup_url,
           paidLoginUrl: response.commercial_next_step.paid_login_url,
           checkoutSourcePath: response.commercial_next_step.checkout_source_path,
+          commercialIntentEndpoint: "/api/v1/commercial/intent",
+          commercialIntentEvent: "commercial_intent_requested",
+          requiresBrowserBillingAccount: true,
           truthBoundaries: response.commercial_next_step.truth_boundaries,
           note:
             "Surface this only after first value. Builder increases limits for production-shaped testing; it does not add live booking inventory, provider-backed rates, live flight fares, or booking support.",
