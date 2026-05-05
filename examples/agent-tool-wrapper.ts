@@ -152,6 +152,24 @@ type PlanValidationPrimitiveResponse = {
   next_step?: string;
 };
 
+type LivePlacesPrimitiveResponse = {
+  beta_caveat?: string;
+  selected_candidate?: { id: string; name: string; source_tiers?: string[] };
+  match_status?: { status: "matched" | "no_match" | string; reason?: string };
+  live_places: {
+    source?: string;
+    retrieved_at?: string;
+    coverage?: Record<string, unknown>;
+    place_candidates?: Record<string, LiveSignalCandidate[]>;
+  };
+  truth_boundaries: {
+    live_booking_inventory: false;
+    provider_backed_rates: false;
+    live_flight_fares: false;
+    booking_supported?: false;
+  };
+};
+
 export async function searchTravelDestinations(input: SearchTravelInput): Promise<AgentTravelResponse> {
   const key = process.env.AICO_TRAVEL_KEY;
 
@@ -204,7 +222,7 @@ async function callHostedMcpTool<TResponse>(name: string, input: object, id: str
   }
 
   const envelope = (await response.json()) as {
-    result?: { content?: Array<{ type: string; text?: string }> };
+    result?: TResponse | { content?: Array<{ type: string; text?: string }> };
     error?: { message?: string };
   };
 
@@ -212,12 +230,30 @@ async function callHostedMcpTool<TResponse>(name: string, input: object, id: str
     throw new Error(envelope.error.message ?? "Agent Travel API MCP returned an error.");
   }
 
-  const text = envelope.result?.content?.find((item) => item.type === "text")?.text;
-  if (!text) {
-    throw new Error(`Agent Travel API MCP returned no text payload for ${name}.`);
+  const result = envelope.result;
+  if (!result) {
+    throw new Error(`Agent Travel API MCP returned no result payload for ${name}.`);
   }
 
-  return JSON.parse(text) as TResponse;
+  if (typeof result === "object" && "content" in result && Array.isArray(result.content)) {
+    const text = result.content.find((item) => item.type === "text")?.text;
+    if (!text) {
+      throw new Error(`Agent Travel API MCP returned no text payload for ${name}.`);
+    }
+    return JSON.parse(text) as TResponse;
+  }
+
+  return result as TResponse;
+}
+
+export async function searchLivePlaces(
+  input: SearchTravelInput & { selected_candidate?: { id?: string; name?: string } },
+): Promise<LivePlacesPrimitiveResponse> {
+  if (!input.user_request) {
+    throw new Error("travel.places.search requires user_request so live-place evidence stays scoped to the user's intent.");
+  }
+
+  return callHostedMcpTool<LivePlacesPrimitiveResponse>("travel.places.search", input, "places-search-1");
 }
 
 export async function validateTravelPlan(input: ValidateTravelPlanInput): Promise<PlanValidationPrimitiveResponse> {
