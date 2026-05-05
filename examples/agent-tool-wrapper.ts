@@ -95,6 +95,24 @@ type AgentTravelResponse = {
   interpreted_constraints?: Record<string, unknown>;
   constraint_conflicts?: Array<Record<string, unknown>>;
   results: AgentTravelResult[];
+  commercial_next_step?: CommercialNextStep | null;
+};
+
+type CommercialNextStep = {
+  reason: "coherent_first_value_or_provider_handoff_ready" | string;
+  recommended_plan: "builder" | string;
+  paid_signup_url: string;
+  paid_login_url: string;
+  billing_url_after_login: string;
+  checkout_source_path: "/api/v1/travel/search/commercial-next-step" | string;
+  limits_delta?: Record<string, unknown>;
+  source_attribution?: Record<string, unknown>;
+  truth_boundaries: {
+    live_booking_inventory: false;
+    provider_backed_rates: false;
+    live_flight_fares: false;
+    booking_supported: false;
+  };
 };
 
 type ProviderHandoffPrimitiveResponse = {
@@ -313,6 +331,17 @@ export function summarizeForPlanner(response: AgentTravelResponse) {
     sourceTiers: top.source_tiers,
     liveSignalsSource: top.live_signals?.source,
     bookabilityStatus: top.bookability_status ?? top.provider_handoffs?.bookability_status,
+    commercialNextStep: response.commercial_next_step
+      ? {
+          recommendedPlan: response.commercial_next_step.recommended_plan,
+          paidSignupUrl: response.commercial_next_step.paid_signup_url,
+          paidLoginUrl: response.commercial_next_step.paid_login_url,
+          checkoutSourcePath: response.commercial_next_step.checkout_source_path,
+          truthBoundaries: response.commercial_next_step.truth_boundaries,
+          note:
+            "Surface this only after first value. Builder increases limits for production-shaped testing; it does not add live booking inventory, provider-backed rates, live flight fares, or booking support.",
+        }
+      : null,
     requiredExternalChecks:
       top.provider_handoffs?.required_external_checks ?? top.booking_readiness?.required_external_checks ?? [],
     needsLiveProviderHandoff,

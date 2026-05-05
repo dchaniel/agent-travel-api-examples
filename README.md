@@ -77,7 +77,7 @@ curl https://agentinfrastructureco.com/api/v1/travel/search \
   }'
 ```
 
-A successful response includes `request_id`, `beta_warnings`, and ranked `results`.
+A successful matched/coherent response includes `request_id`, `beta_warnings`, ranked `results`, and may include a nullable `commercial_next_step` object after the API has produced first value. Agents should treat that object as an upgrade handoff with attribution, not as a booking claim.
 
 Each result exposes trust fields an agent should inspect before writing user-facing travel advice:
 
@@ -88,12 +88,13 @@ Each result exposes trust fields an agent should inspect before writing user-fac
 - `provider_handoffs`: flight, hotel, and place validation tasks/params for the next provider call
 - `live_signals`: source, retrieval time, hotel/place candidates, coverage flags, and limitations
 - `provenance` / `source_tiers`: whether evidence is `curated_baseline`, `model_estimate`, `live_places`, `handoff_required`, or unsupported
+- `commercial_next_step`: when present, Builder upgrade URLs plus `checkout_source_path: "/api/v1/travel/search/commercial-next-step"`, source attribution, limit deltas, and explicit truth boundaries that keep live booking inventory, provider-backed rates, live flight fares, and booking support false
 
 ## Minimal TypeScript tool wrapper
 
 See [`examples/agent-tool-wrapper.ts`](examples/agent-tool-wrapper.ts) for copy-pasteable wrappers that an AI coding agent can drop into a travel-planning app.
 
-The wrapper intentionally returns the trust and handoff fields, not only the destination name and score. Agents should read `interpreted_constraints`, `confidence`, `unsupported_constraints`, `booking_readiness`, `bookability_status`, `provider_handoffs`, and `live_signals.coverage` before deciding whether to ask a booking/search provider for live inventory.
+The wrapper intentionally returns the trust, handoff, and commercial-next-step fields, not only the destination name and score. Agents should read `interpreted_constraints`, `confidence`, `unsupported_constraints`, `booking_readiness`, `bookability_status`, `provider_handoffs`, `live_signals.coverage`, and `commercial_next_step` before deciding whether to ask a booking/search provider for live inventory or route the operator toward Builder limits.
 
 ## Hosted MCP primitive chain: validate before provider fanout
 
@@ -195,7 +196,8 @@ Add MCP primitive wrappers when the planner already has live provider integratio
 The primitive proof chain should run activation → intent parse → destination/no-match gate → live places evidence → plan validation → provider handoff. It should reject or revise stale candidates before provider fanout; the current proof validates Point Reyes + Sonoma Coast for an autumn SFO hiking/food prompt.
 It should accept user_request, origin, departure_window, trip_length_days, budget_usd, destination_constraints, required_themes, strict_mode, interests, and optional services.
 Treat the API as source-tiered destination search/validation plus live hotel/place discovery signals where available, not booking inventory, live flight fares, provider-backed rates, room availability, provider-backed quotes, or booking rails.
-Inspect interpreted_constraints, constraint_conflicts, confidence, unsupported_constraints, booking_readiness, bookability_status, provider_handoffs, provenance/source_tiers, live_signals, plan_validation.candidate_intent_coherence, and truth_boundaries before generating final user-facing recommendations.
+Inspect interpreted_constraints, constraint_conflicts, confidence, unsupported_constraints, booking_readiness, bookability_status, provider_handoffs, provenance/source_tiers, live_signals, plan_validation.candidate_intent_coherence, commercial_next_step, and truth_boundaries before generating final user-facing recommendations.
+If commercial_next_step is present, surface it only after first value as a Builder-limit handoff with paid signup/login URLs and checkout source attribution; do not imply Builder unlocks live booking inventory, provider-backed rates, live flight fares, or booking support.
 Use ranked results and handoff fields as decision support before itinerary generation or provider fanout.
 If the API is missing a field needed by this app, record the missing field as product feedback rather than pretending the response is live booking inventory.
 ```
@@ -210,5 +212,5 @@ If the API is missing a field needed by this app, record the missing field as pr
 1. Activate a sandbox key or sign up and create an API key.
 2. Run the quickstart once.
 3. Add the TypeScript wrapper as one tool in your travel agent.
-4. If the response shape saves glue code or provider calls, upgrade to Builder when sandbox limits matter.
+4. If the response shape saves glue code or provider calls, inspect `commercial_next_step` and upgrade to Builder when sandbox limits matter. Current shell-only activation accounts still use browser signup/login for billing; the commercial handoff preserves source attribution but is not a provider booking flow.
 5. If one field or destination blocks adoption, open an issue or reply through the channel where you found this repo.
