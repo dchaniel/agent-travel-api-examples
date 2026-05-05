@@ -6,7 +6,7 @@ Public quickstarts for integrating Agent Travel API into AI travel agents, itine
 
 Agent Travel API is an agent-native travel search and validation API built for AI agents.
 
-One API call turns a messy trip prompt plus optional hard constraints into source-aware destination JSON with interpreted constraints, conflict handling, ranking breakdowns, beta warnings, confidence, unsupported constraints, provenance, live hotel/place discovery signals where available, and provider-ready handoffs. Hosted MCP also exposes composable primitives such as `travel.intent.parse` and `travel.provider_handoffs.generate` for agents that need parsing or handoff setup without a ranked itinerary response.
+One API call turns a messy trip prompt plus optional hard constraints into source-aware destination JSON with interpreted constraints, conflict handling, ranking breakdowns, beta warnings, confidence, unsupported constraints, provenance, live hotel/place discovery signals where available, and provider-ready handoffs. Hosted MCP also exposes composable primitives such as `travel.intent.parse`, `travel.destinations.search`, `travel.plan.validate`, and `travel.provider_handoffs.generate` for agents that want to parse intent, gate candidates, validate a proposed plan/candidate, and prepare provider handoffs without forcing every step through one ranked itinerary response.
 
 Human developers are the operators and economic buyers, but agents are the core audience: the API is meant to be easy for an agent to discover, understand, activate, call, and evaluate.
 
@@ -95,6 +95,49 @@ See [`examples/agent-tool-wrapper.ts`](examples/agent-tool-wrapper.ts) for copy-
 
 The wrapper intentionally returns the trust and handoff fields, not only the destination name and score. Agents should read `interpreted_constraints`, `confidence`, `unsupported_constraints`, `booking_readiness`, `bookability_status`, `provider_handoffs`, and `live_signals.coverage` before deciding whether to ask a booking/search provider for live inventory.
 
+## Hosted MCP primitive chain: validate before provider fanout
+
+For agents that prefer composable tools, run the hosted MCP chain before spending live provider calls:
+
+1. `travel.intent.parse` preserves the messy prompt and hard constraints.
+2. `travel.destinations.search` returns in-scope candidates or a structured no-match/handoff state.
+3. `travel.plan.validate` checks a selected candidate/proposed plan for candidate/date/season/theme coherence and unsupported live booking/rate/fare claims.
+4. `travel.provider_handoffs.generate` prepares provider-ready flight/hotel/place validation tasks only after the candidate passes validation.
+
+The current eval proof selects `Point Reyes + Sonoma Coast` for a broad autumn SFO hiking/food request, reports `candidate_intent_coherence.status: coherent`, preserves false live airfare / live booking inventory / provider-backed rates boundaries, and marks Builder as worth testing.
+
+Minimal `travel.plan.validate` JSON-RPC shape:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": "validate-1",
+  "method": "tools/call",
+  "params": {
+    "name": "travel.plan.validate",
+    "arguments": {
+      "user_request": "Validate a 5-day autumn hiking and food trip from SFO under $4,500 before live provider fanout.",
+      "origin": "SFO",
+      "departure_window": ["2026-10-01", "2026-10-06"],
+      "trip_length_days": 5,
+      "budget_usd": 4500,
+      "interests": ["hiking", "food"],
+      "strict_mode": true,
+      "proposed_plan": {
+        "candidate_id": "point-reyes-sonoma-coast",
+        "destination_name": "Point Reyes + Sonoma Coast",
+        "departure_window": ["2026-10-01", "2026-10-06"],
+        "trip_length_days": 5,
+        "themes": ["hiking", "food"],
+        "claims": []
+      }
+    }
+  }
+}
+```
+
+Inspect `plan_validation.candidate_intent_coherence`, `plan_validation.unsupported_live_claims`, `provider_validation_required`, `required_external_checks`, and `truth_boundaries` before user-facing booking/rate/fare language.
+
 ## Hosted MCP primitive: provider handoff only
 
 If your planner already has Amadeus, Booking, Google Places, Browserless, Serper, or another live provider layer, use the hosted MCP tool `travel.provider_handoffs.generate` when you want provider-ready setup without ranked destinations.
@@ -140,10 +183,15 @@ Read:
 
 Add one REST tool/function named searchTravelDestinations for ranked destination search.
 It should call POST https://agentinfrastructureco.com/api/v1/travel/search with bearer auth from AICO_TRAVEL_KEY, or call the hosted MCP tool rank_travel_destinations when the runtime prefers MCP-style ranked tools.
-Add a second MCP-only primitive named generateProviderHandoffs when the planner already has live provider integrations and only needs setup for downstream validation. It should call the hosted MCP tool `travel.provider_handoffs.generate`, require user_request, and return handoff fields without ranked destinations.
+Add MCP primitive wrappers when the planner already has live provider integrations and wants a composable pre-provider chain:
+- parseTravelIntent → hosted MCP `travel.intent.parse`
+- searchCandidateDestinations → hosted MCP `travel.destinations.search`
+- validateTravelPlan → hosted MCP `travel.plan.validate`
+- generateProviderHandoffs → hosted MCP `travel.provider_handoffs.generate`
+The primitive chain should run intent parse → destination/no-match gate → plan validation → provider handoff. It should reject or revise stale candidates before provider fanout; the current proof validates Point Reyes + Sonoma Coast for an autumn SFO hiking/food prompt.
 It should accept user_request, origin, departure_window, trip_length_days, budget_usd, destination_constraints, required_themes, strict_mode, interests, and optional services.
 Treat the API as source-tiered destination search/validation plus live hotel/place discovery signals where available, not booking inventory, live flight fares, provider-backed rates, room availability, provider-backed quotes, or booking rails.
-Inspect interpreted_constraints, constraint_conflicts, confidence, unsupported_constraints, booking_readiness, bookability_status, provider_handoffs, provenance/source_tiers, and live_signals before generating final user-facing recommendations.
+Inspect interpreted_constraints, constraint_conflicts, confidence, unsupported_constraints, booking_readiness, bookability_status, provider_handoffs, provenance/source_tiers, live_signals, plan_validation.candidate_intent_coherence, and truth_boundaries before generating final user-facing recommendations.
 Use ranked results and handoff fields as decision support before itinerary generation or provider fanout.
 If the API is missing a field needed by this app, record the missing field as product feedback rather than pretending the response is live booking inventory.
 ```

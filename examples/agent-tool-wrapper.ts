@@ -115,6 +115,43 @@ type ProviderHandoffPrimitiveResponse = {
   next_step?: string;
 };
 
+type ProposedTravelPlan = {
+  candidate_id?: string;
+  destination_name: string;
+  departure_window?: [string, string];
+  trip_length_days?: number;
+  themes?: string[];
+  claims?: string[];
+};
+
+type ValidateTravelPlanInput = SearchTravelInput & {
+  proposed_plan: ProposedTravelPlan;
+};
+
+type PlanValidationPrimitiveResponse = {
+  beta_caveat?: string;
+  interpreted_constraints?: Record<string, unknown>;
+  constraint_conflicts?: Array<Record<string, unknown>>;
+  plan_validation: {
+    status: "coherent" | "needs_revision" | "blocked" | string;
+    candidate_intent_coherence: {
+      status: "coherent" | "mismatch_detected" | string;
+      selected_candidate?: string;
+      mismatch_signals?: string[];
+    };
+    unsupported_live_claims: string[];
+    provider_validation_required: boolean;
+    required_external_checks: string[];
+  };
+  truth_boundaries: {
+    live_airfare: false;
+    live_booking_inventory: false;
+    provider_backed_rates: false;
+    booking_supported: false;
+  };
+  next_step?: string;
+};
+
 export async function searchTravelDestinations(input: SearchTravelInput): Promise<AgentTravelResponse> {
   const key = process.env.AICO_TRAVEL_KEY;
 
@@ -138,15 +175,11 @@ export async function searchTravelDestinations(input: SearchTravelInput): Promis
   return (await response.json()) as AgentTravelResponse;
 }
 
-export async function generateProviderHandoffs(input: SearchTravelInput): Promise<ProviderHandoffPrimitiveResponse> {
+async function callHostedMcpTool<TResponse>(name: string, input: object, id: string): Promise<TResponse> {
   const key = process.env.AICO_TRAVEL_KEY;
 
   if (!key) {
     throw new Error("Set AICO_TRAVEL_KEY to a dashboard or activation API key before calling Agent Travel API MCP.");
-  }
-
-  if (!input.user_request) {
-    throw new Error("travel.provider_handoffs.generate requires user_request so handoff setup preserves the user's hard scope.");
   }
 
   const response = await fetch("https://agentinfrastructureco.com/mcp", {
@@ -157,10 +190,10 @@ export async function generateProviderHandoffs(input: SearchTravelInput): Promis
     },
     body: JSON.stringify({
       jsonrpc: "2.0",
-      id: "provider-handoffs-1",
+      id,
       method: "tools/call",
       params: {
-        name: "travel.provider_handoffs.generate",
+        name,
         arguments: input,
       },
     }),
@@ -181,10 +214,34 @@ export async function generateProviderHandoffs(input: SearchTravelInput): Promis
 
   const text = envelope.result?.content?.find((item) => item.type === "text")?.text;
   if (!text) {
-    throw new Error("Agent Travel API MCP returned no text payload for provider handoffs.");
+    throw new Error(`Agent Travel API MCP returned no text payload for ${name}.`);
   }
 
-  return JSON.parse(text) as ProviderHandoffPrimitiveResponse;
+  return JSON.parse(text) as TResponse;
+}
+
+export async function validateTravelPlan(input: ValidateTravelPlanInput): Promise<PlanValidationPrimitiveResponse> {
+  if (!input.user_request) {
+    throw new Error("travel.plan.validate requires user_request so validation preserves the user's hard scope.");
+  }
+
+  if (!input.proposed_plan?.destination_name) {
+    throw new Error("travel.plan.validate requires proposed_plan.destination_name.");
+  }
+
+  return callHostedMcpTool<PlanValidationPrimitiveResponse>("travel.plan.validate", input, "plan-validate-1");
+}
+
+export async function generateProviderHandoffs(input: SearchTravelInput): Promise<ProviderHandoffPrimitiveResponse> {
+  if (!input.user_request) {
+    throw new Error("travel.provider_handoffs.generate requires user_request so handoff setup preserves the user's hard scope.");
+  }
+
+  return callHostedMcpTool<ProviderHandoffPrimitiveResponse>(
+    "travel.provider_handoffs.generate",
+    input,
+    "provider-handoffs-1",
+  );
 }
 
 export function summarizeForPlanner(response: AgentTravelResponse) {
