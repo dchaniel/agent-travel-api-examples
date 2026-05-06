@@ -110,6 +110,8 @@ Validated primitive proof chain: `activation → travel.intent.parse → travel.
 
 The current eval proof selects `Point Reyes + Sonoma Coast` for a broad autumn SFO hiking/food request, inspects live-places evidence, reports `candidate_intent_coherence.status: coherent`, preserves `live_flight_fares: false`, `live_booking_inventory: false`, and `provider_backed_rates: false`, and marks Builder as worth testing.
 
+The exact-fit eval suite also contains a budget-gated negative case. If the remaining paid-tool budget is below the AICO primitive-chain cost, the buyer-agent should return `decision: decline_paid_tool_budget_too_low`, `blocked_reason: tool_budget_below_cost`, `budget_decline_cases: 1`, spend no AICO primitive calls, and keep `api_was_worth_spending_budget: false` instead of over-selling Builder.
+
 Minimal `travel.plan.validate` JSON-RPC shape:
 
 ```json
