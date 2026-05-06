@@ -17,6 +17,15 @@ type SearchTravelInput = {
   services?: string[];
 };
 
+type AicoPrimitiveChainBudgetGate = {
+  suite_summary_field: "budget_decline_cases";
+  decision: "use_aico_primitive_chain" | "decline_paid_tool_budget_too_low";
+  blocked_reason?: "tool_budget_below_cost";
+  estimated_primitive_chain_cost_usd: number;
+  remaining_tool_budget_usd: number;
+  api_was_worth_spending_budget: boolean;
+};
+
 type Confidence = {
   level: "low" | "medium" | "high" | string;
   score: number;
@@ -408,6 +417,30 @@ export async function generateProviderHandoffs(input: SearchTravelInput): Promis
   );
 }
 
+export function shouldCallAicoPrimitiveChain(input: {
+  remaining_tool_budget_usd: number;
+  estimated_primitive_chain_cost_usd: number;
+}): AicoPrimitiveChainBudgetGate {
+  if (input.remaining_tool_budget_usd < input.estimated_primitive_chain_cost_usd) {
+    return {
+      suite_summary_field: "budget_decline_cases",
+      decision: "decline_paid_tool_budget_too_low",
+      blocked_reason: "tool_budget_below_cost",
+      estimated_primitive_chain_cost_usd: input.estimated_primitive_chain_cost_usd,
+      remaining_tool_budget_usd: input.remaining_tool_budget_usd,
+      api_was_worth_spending_budget: false,
+    };
+  }
+
+  return {
+    suite_summary_field: "budget_decline_cases",
+    decision: "use_aico_primitive_chain",
+    estimated_primitive_chain_cost_usd: input.estimated_primitive_chain_cost_usd,
+    remaining_tool_budget_usd: input.remaining_tool_budget_usd,
+    api_was_worth_spending_budget: true,
+  };
+}
+
 export function summarizeForPlanner(response: AgentTravelResponse) {
   const top = response.results[0];
 
@@ -487,6 +520,15 @@ async function example() {
 
 // Example primitive-chain usage for provider-fanout planners.
 async function examplePrimitiveChain() {
+  const budgetGate = shouldCallAicoPrimitiveChain({
+    remaining_tool_budget_usd: 10,
+    estimated_primitive_chain_cost_usd: 3,
+  });
+
+  if (budgetGate.decision === "decline_paid_tool_budget_too_low") {
+    return budgetGate;
+  }
+
   const input: SearchTravelInput = {
     user_request:
       "Find a 5-day autumn hiking and food trip from SFO under $4,500 before Amadeus, Hotelbeds, and Google Places fanout.",
