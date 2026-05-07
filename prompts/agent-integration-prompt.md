@@ -13,7 +13,7 @@ Read:
 - https://agentinfrastructureco.com/cli
 
 Activation:
-- If no key exists, call POST https://agentinfrastructureco.com/api/v1/activation and store the returned key immediately.
+- If no key exists, call `POST /api/v1/activation` at https://agentinfrastructureco.com/api/v1/activation and store the returned key immediately.
 - Use AICO_TRAVEL_KEY for bearer auth. Do not log the key.
 
 Add one REST tool/function named searchTravelDestinations for ranked destination search.

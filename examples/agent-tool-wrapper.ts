@@ -159,6 +159,27 @@ type AgentApiRequestResponse = {
   accepted_fields?: string[];
 };
 
+type ActivationResponse = {
+  api_key: string;
+  returned_once: true;
+  store_immediately: true;
+  first_call?: {
+    method?: "POST" | string;
+    url?: string;
+  };
+  limits?: {
+    requests_per_hour?: number;
+    requests_per_month?: number;
+  };
+  billing_next_step?: Record<string, unknown>;
+  product_truth?: {
+    live_booking_inventory: false;
+    provider_backed_rates: false;
+    live_flight_fares: false;
+    booking_supported?: false;
+  };
+};
+
 type UsedGoodsDealValidationInput = {
   title?: string;
   item_query?: string;
@@ -293,6 +314,32 @@ type DestinationSearchPrimitiveResponse = {
   };
   next_step?: string;
 };
+
+export async function activateAicoSandbox(input: {
+  agent_name: string;
+  intended_use: string;
+}): Promise<ActivationResponse> {
+  const response = await fetch("https://agentinfrastructureco.com/api/v1/activation", {
+    // POST /api/v1/activation returns a low-quota sandbox key exactly once.
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Agent Travel API activation returned ${response.status}: ${await response.text()}`);
+  }
+
+  const activation = (await response.json()) as ActivationResponse;
+
+  if (!activation.api_key || activation.returned_once !== true || activation.store_immediately !== true) {
+    throw new Error("Activation response did not include the raw key returned-once contract; do not proceed without a stored key.");
+  }
+
+  // Store activation.api_key immediately in AICO_TRAVEL_KEY or your secret manager.
+  // Never log the raw key. The low-quota sandbox key is intended for first-value evaluation before paid billing.
+  return activation;
+}
 
 export async function searchTravelDestinations(input: SearchTravelInput): Promise<AgentTravelResponse> {
   const key = process.env.AICO_TRAVEL_KEY;
