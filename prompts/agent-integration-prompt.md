@@ -44,5 +44,5 @@ If commercial_next_step is present, surface it only after first value as a Build
 If the operator wants Builder limits, call POST /api/v1/commercial/intent with the same request_id and source_path /api/v1/travel/search/commercial-next-step to record commercial_intent_requested from API-key context before browser-authenticated billing. Expect requires_browser_billing_account until a safe billing bridge exists.
 
 Use ranked results and handoff fields as decision support before itinerary generation or provider fanout.
-If the API is missing a field needed by this app, submit structured feedback through POST /api/v1/feedback or hosted MCP feedback.submit rather than pretending the response is live booking inventory.
+If the API is missing a field needed by this app, submit structured feedback through POST /api/v1/feedback or hosted MCP feedback.submit. If the blocker is a missing AICO primitive the planner would pay to use, call POST /api/v1/api-requests with requested_api_name, concrete problem, expected inputs/outputs, current workaround, urgency, and agent_context so AICO can classify it under agent_requested_api with conditional $100 usage-credit eligibility if AICO builds the requested primitive. Do not pretend the response is live booking inventory.
 ```
