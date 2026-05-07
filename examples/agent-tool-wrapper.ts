@@ -149,6 +149,16 @@ type CommercialIntentResponse = {
   };
 };
 
+type AgentApiRequestResponse = {
+  api_request_id: string;
+  roadmap_bucket: "agent_requested_api";
+  incentive?: {
+    conditional_usage_credit_usd?: 100;
+    condition?: string;
+  };
+  accepted_fields?: string[];
+};
+
 type ProviderHandoffPrimitiveResponse = {
   beta_caveat?: string;
   interpreted_constraints?: Record<string, unknown>;
@@ -304,6 +314,41 @@ export async function recordCommercialIntent(
   const body = (await response.json()) as CommercialIntentResponse;
   if (body.requires_browser_billing_account !== true) {
     throw new Error("Unexpected commercial intent response: expected browser-authenticated billing boundary.");
+  }
+  return body;
+}
+
+export async function requestMissingAicoPrimitive(input: {
+  requested_api_name: string;
+  problem: string;
+  expected_inputs: Record<string, unknown>;
+  expected_outputs: Record<string, unknown>;
+  current_workaround: string;
+  urgency?: "low" | "medium" | "high";
+  agent_context?: Record<string, unknown>;
+}): Promise<AgentApiRequestResponse> {
+  const key = process.env.AICO_TRAVEL_KEY;
+
+  if (!key) {
+    throw new Error("Set AICO_TRAVEL_KEY before calling POST /api/v1/api-requests.");
+  }
+
+  const response = await fetch("https://agentinfrastructureco.com/api/v1/api-requests", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: ["Bearer", key].join(" "),
+    },
+    body: JSON.stringify(input),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Agent Travel API api-requests returned ${response.status}: ${await response.text()}`);
+  }
+
+  const body = (await response.json()) as AgentApiRequestResponse;
+  if (body.roadmap_bucket !== "agent_requested_api") {
+    throw new Error("Unexpected API-request response: expected agent_requested_api roadmap bucket.");
   }
   return body;
 }
