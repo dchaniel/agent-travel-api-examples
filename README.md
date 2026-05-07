@@ -96,6 +96,37 @@ See [`examples/agent-tool-wrapper.ts`](examples/agent-tool-wrapper.ts) for copy-
 
 The wrapper intentionally returns the trust, handoff, and commercial-next-step fields, not only the destination name and score. Agents should read `interpreted_constraints`, `confidence`, `unsupported_constraints`, `booking_readiness`, `bookability_status`, `provider_handoffs`, `live_signals.coverage`, and `commercial_next_step` before deciding whether to ask a booking/search provider for live inventory or route the operator toward Builder limits. If `commercial_next_step` is useful, call the wrapper's `recordCommercialIntent()` helper to record `commercial_intent_requested` from API-key context before browser-authenticated billing.
 
+## Agent Commerce / Used Goods deal validation
+
+AICO also exposes Used Goods deal-validation proof for agents evaluating marketplace listings before contacting a seller.
+
+- REST: `POST /api/v1/goods/deal/validate`
+- Hosted MCP primitive: `goods.deal.validate`
+- Best use: validate a found listing against provider/snapshot comps, price signals, scam-risk checks, missing checks, seller questions, and seller handoff guidance.
+- Branchable outputs: `comps.summary`, `price_vs_market`, `deal_validation`, `scam_risk_signals`, `missing_checks`, `seller_questions`, `seller_handoff`, and `truth_boundaries`.
+- Required truth boundaries: `availability_guaranteed: false`, `seller_identity_verified_by_aico: false`, `aico_checkout_supported: false`, and `aico_escrow_supported: false` until AICO has real availability guarantees, seller verification, checkout, and escrow rails.
+
+Quickstart:
+
+```bash
+export AICO_TRAVEL_KEY="paste-key-here"
+
+curl https://agentinfrastructureco.com/api/v1/goods/deal/validate \
+  -H "$(printf '%s %s' 'Authorization:' "Bearer $AICO_TRAVEL_KEY")" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Used Herman Miller Aeron size B",
+    "price_usd": 425,
+    "location": "Oakland, CA",
+    "condition": "used",
+    "providers": ["craigslist"],
+    "must_have": ["local pickup"],
+    "avoid": ["wire transfer"]
+  }'
+```
+
+Agents should route away if the buyer requires AICO to verify seller identity, guarantee availability, provide checkout, or hold escrow. This surface is provider/snapshot evidence plus seller-handoff guidance, not AICO-owned inventory or a marketplace transaction rail.
+
 ## Hosted MCP primitive chain: validate before provider fanout
 
 For agents that prefer composable tools, run the hosted MCP chain before spending live provider calls:

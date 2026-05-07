@@ -44,5 +44,13 @@ If commercial_next_step is present, surface it only after first value as a Build
 If the operator wants Builder limits, call POST /api/v1/commercial/intent with the same request_id and source_path /api/v1/travel/search/commercial-next-step to record commercial_intent_requested from API-key context before browser-authenticated billing. Expect requires_browser_billing_account until a safe billing bridge exists.
 
 Use ranked results and handoff fields as decision support before itinerary generation or provider fanout.
-If the API is missing a field needed by this app, submit structured feedback through POST /api/v1/feedback or hosted MCP feedback.submit. If the blocker is a missing AICO primitive the planner would pay to use, call POST /api/v1/api-requests with requested_api_name, concrete problem, expected inputs/outputs, current workaround, urgency, and agent_context so AICO can classify it under agent_requested_api with conditional $100 usage-credit eligibility if AICO builds the requested primitive. Do not pretend the response is live booking inventory.
+
+If this agent also evaluates used-goods marketplace listings, add a separate deal-validation tool:
+- REST: POST /api/v1/goods/deal/validate
+- Hosted MCP: goods.deal.validate
+- Input should include title or item_query, price_usd, optional listing_url/location/condition/providers, must_have, and avoid.
+- Inspect comps.summary, price_vs_market, deal_validation, scam_risk_signals, missing_checks, seller_questions, seller_handoff, and truth_boundaries before recommending seller contact.
+- Preserve exact marketplace boundaries: availability_guaranteed: false, seller_identity_verified_by_aico: false, aico_checkout_supported: false, and aico_escrow_supported: false. Route away if the buyer requires AICO seller verification, guaranteed availability, checkout, or escrow.
+
+If the API is missing a field needed by this app, submit structured feedback through POST /api/v1/feedback or hosted MCP feedback.submit. If the blocker is a missing AICO primitive the planner would pay to use, call POST /api/v1/api-requests with requested_api_name, concrete problem, expected inputs/outputs, current workaround, urgency, and agent_context so AICO can classify it under agent_requested_api with conditional $100 usage-credit eligibility if AICO builds the requested primitive. Do not pretend the response is live booking inventory or marketplace transaction rails.
 ```

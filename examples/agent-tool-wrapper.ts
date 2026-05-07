@@ -159,6 +159,38 @@ type AgentApiRequestResponse = {
   accepted_fields?: string[];
 };
 
+type UsedGoodsDealValidationInput = {
+  title?: string;
+  item_query?: string;
+  price_usd: number;
+  listing_url?: string;
+  location?: string;
+  condition?: string;
+  providers?: Array<"ebay" | "craigslist" | string>;
+  must_have?: string[];
+  avoid?: string[];
+};
+
+type UsedGoodsDealValidationResponse = {
+  request_id: string;
+  comps: {
+    summary?: Record<string, unknown>;
+    listings?: Array<Record<string, unknown>>;
+  };
+  price_vs_market: Record<string, unknown>;
+  deal_validation: Record<string, unknown>;
+  scam_risk_signals: string[];
+  missing_checks: string[];
+  seller_questions: string[];
+  seller_handoff?: Record<string, unknown>;
+  truth_boundaries: {
+    availability_guaranteed: false;
+    seller_identity_verified_by_aico: false;
+    aico_checkout_supported: false;
+    aico_escrow_supported: false;
+  };
+};
+
 type ProviderHandoffPrimitiveResponse = {
   beta_caveat?: string;
   interpreted_constraints?: Record<string, unknown>;
@@ -349,6 +381,46 @@ export async function requestMissingAicoPrimitive(input: {
   const body = (await response.json()) as AgentApiRequestResponse;
   if (body.roadmap_bucket !== "agent_requested_api") {
     throw new Error("Unexpected API-request response: expected agent_requested_api roadmap bucket.");
+  }
+  return body;
+}
+
+export async function validateUsedGoodsDeal(
+  input: UsedGoodsDealValidationInput,
+): Promise<UsedGoodsDealValidationResponse> {
+  const key = process.env.AICO_TRAVEL_KEY;
+
+  if (!key) {
+    throw new Error("Set AICO_TRAVEL_KEY before calling POST /api/v1/goods/deal/validate.");
+  }
+
+  if (!input.title && !input.item_query) {
+    throw new Error("goods.deal.validate requires title or item_query.");
+  }
+
+  const response = await fetch("https://agentinfrastructureco.com/api/v1/goods/deal/validate", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: ["Bearer", key].join(" "),
+    },
+    body: JSON.stringify(input),
+  });
+
+  if (!response.ok) {
+    throw new Error(`AICO Used Goods deal validation returned ${response.status}: ${await response.text()}`);
+  }
+
+  const body = (await response.json()) as UsedGoodsDealValidationResponse;
+  if (
+    body.truth_boundaries.availability_guaranteed !== false ||
+    body.truth_boundaries.seller_identity_verified_by_aico !== false ||
+    body.truth_boundaries.aico_checkout_supported !== false ||
+    body.truth_boundaries.aico_escrow_supported !== false
+  ) {
+    throw new Error(
+      "Unexpected Used Goods truth boundaries: AICO should not claim guaranteed availability, seller verification, checkout, or escrow.",
+    );
   }
   return body;
 }
@@ -628,5 +700,18 @@ async function examplePrimitiveChain() {
   return { intent, destinations, livePlaces, validation, handoffs, decision: "execute_provider_handoffs" };
 }
 
+async function exampleUsedGoodsDealValidation() {
+  return validateUsedGoodsDeal({
+    title: "Used Herman Miller Aeron size B",
+    price_usd: 425,
+    location: "Oakland, CA",
+    condition: "used",
+    providers: ["craigslist"],
+    must_have: ["local pickup"],
+    avoid: ["wire transfer"],
+  });
+}
+
 void example;
 void examplePrimitiveChain;
+void exampleUsedGoodsDealValidation;
