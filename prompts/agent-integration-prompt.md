@@ -33,15 +33,15 @@ The current public proof validates Point Reyes + Sonoma Coast for an autumn SFO 
 
 If google_aggregator_signals, aggregator_fare_snapshots, or hotel_rate_snapshots appear, treat them as AICO-operated provider-search setup/handoff evidence only. They are not live airfare, provider-backed hotel rates, room availability, taxes/fees validation, booking inventory, checkout availability, or a booking rail.
 
-The suite also has a budget-gated negative case: if the remaining paid-tool budget is below the AICO primitive-chain cost, return decision decline_paid_tool_budget_too_low with blocked_reason tool_budget_below_cost, count budget_decline_cases separately, make no AICO primitive calls, and keep api_was_worth_spending_budget false rather than pitching Builder.
+The suite also has a budget-gated negative case: if the remaining paid-tool budget is below the AICO primitive-chain cost, return decision decline_paid_tool_budget_too_low with blocked_reason tool_budget_below_cost, count budget_decline_cases separately, make no AICO primitive calls, and keep api_was_worth_spending_budget false rather than pitching the paid path.
 
 Treat the API as source-tiered destination search/validation plus live place discovery signals where available. It is not booking inventory, live flight fares, provider-backed hotel rates, room availability, provider-backed quotes, taxes/fees validation, checkout availability, or a booking rail.
 
 Inspect interpreted_constraints, constraint_conflicts, confidence, unsupported_constraints, booking_readiness, bookability_status, provider_handoffs, provenance/source_tiers, live_signals, live_places, plan_validation.candidate_intent_coherence, commercial_next_step, and truth_boundaries before generating final user-facing recommendations.
 
-If commercial_next_step is present, surface it only after first value as a Builder-limit handoff with paid signup/login URLs and checkout source attribution. Do not imply Builder unlocks live booking inventory, provider-backed rates, live flight fares, room availability, taxes/fees validation, checkout availability, or booking support.
+If commercial_next_step is present, surface it only after first value as a Hobby flat-recurring handoff with paid signup/login URLs and checkout source attribution. Do not imply Hobby unlocks live booking inventory, provider-backed rates, live flight fares, room availability, taxes/fees validation, checkout availability, or booking support.
 
-If the operator wants Builder limits, call POST /api/v1/commercial/intent with the same request_id and source_path /api/v1/travel/search/commercial-next-step to record commercial_intent_requested from API-key context before browser-authenticated billing. Expect requires_browser_billing_account until a safe billing bridge exists.
+If the operator wants Hobby $5/mo flat recurring subscription limits (`pricing_model: "flat_recurring_subscription"`), call POST /api/v1/commercial/intent with the same request_id and source_path /api/v1/travel/search/commercial-next-step to record commercial_intent_requested from API-key context before browser-authenticated billing. Expect requires_browser_billing_account until a safe billing bridge exists.
 
 Use ranked results and handoff fields as decision support before itinerary generation or provider fanout.
 

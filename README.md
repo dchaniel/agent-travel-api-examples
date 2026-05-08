@@ -77,7 +77,7 @@ curl https://agentinfrastructureco.com/api/v1/travel/search \
   }'
 ```
 
-A successful matched/coherent response includes `request_id`, `beta_warnings`, ranked `results`, and may include a nullable `commercial_next_step` object after the API has produced first value. Agents should treat that object as an upgrade handoff with attribution, not as a booking claim. If Builder/Hobby limits are worth testing, an API-key-authenticated agent can then call `POST /api/v1/commercial/intent` with the first-value `request_id` and `source_path: "/api/v1/travel/search/commercial-next-step"` to record `commercial_intent_requested` before opening browser-authenticated billing; the response currently returns `requires_browser_billing_account: true` plus paid signup/login URLs. If a missing primitive blocks adoption, call `POST /api/v1/api-requests` so the blocker is stored as `agent_requested_api` with conditional $100 usage-credit eligibility if AICO builds the requested primitive.
+A successful matched/coherent response includes `request_id`, `beta_warnings`, ranked `results`, and may include a nullable `commercial_next_step` object after the API has produced first value. Agents should treat that object as an upgrade handoff with attribution, not as a booking claim. If Hobby $5/mo flat recurring subscription limits are worth testing (`pricing_model: "flat_recurring_subscription"`), an API-key-authenticated agent can then call `POST /api/v1/commercial/intent` with the first-value `request_id` and `source_path: "/api/v1/travel/search/commercial-next-step"` to record `commercial_intent_requested` before opening browser-authenticated billing; the response currently returns `requires_browser_billing_account: true` plus paid signup/login URLs. If a missing primitive blocks adoption, call `POST /api/v1/api-requests` so the blocker is stored as `agent_requested_api` with conditional $100 usage-credit eligibility if AICO builds the requested primitive.
 
 Each result exposes trust fields an agent should inspect before writing user-facing travel advice:
 
@@ -88,7 +88,7 @@ Each result exposes trust fields an agent should inspect before writing user-fac
 - `provider_handoffs`: flight, hotel, and place validation tasks/params for the next provider call
 - `live_signals`: source, retrieval time, hotel/place candidates, coverage flags, and limitations
 - `provenance` / `source_tiers`: whether evidence is `curated_baseline`, `model_estimate`, `live_places`, `handoff_required`, or unsupported
-- `commercial_next_step`: when present, Builder upgrade URLs plus `checkout_source_path: "/api/v1/travel/search/commercial-next-step"`, source attribution, limit deltas, and explicit truth boundaries that keep live booking inventory, provider-backed rates, live flight fares, and booking support false
+- `commercial_next_step`: when present, Hobby paid signup/login URLs plus `checkout_source_path: "/api/v1/travel/search/commercial-next-step"`, source attribution, limit deltas, and explicit truth boundaries that keep live booking inventory, provider-backed rates, live flight fares, and booking support false
 
 ## Minimal TypeScript tool wrapper
 
@@ -139,9 +139,9 @@ Validated primitive proof chain: `activation → travel.intent.parse → travel.
 4. `travel.plan.validate` checks the selected candidate/proposed plan for candidate/date/season/theme coherence and unsupported live booking/rate/fare claims.
 5. `travel.provider_handoffs.generate` prepares provider-ready flight/hotel/place validation tasks only after the candidate passes validation.
 
-The current eval proof selects `Point Reyes + Sonoma Coast` for a broad autumn SFO hiking/food request, inspects live-places evidence, reports `candidate_intent_coherence.status: coherent`, preserves `live_flight_fares: false`, `live_booking_inventory: false`, and `provider_backed_rates: false`, and marks Builder as worth testing.
+The current eval proof selects `Point Reyes + Sonoma Coast` for a broad autumn SFO hiking/food request, inspects live-places evidence, reports `candidate_intent_coherence.status: coherent`, preserves `live_flight_fares: false`, `live_booking_inventory: false`, and `provider_backed_rates: false`, and marks Hobby higher-limit testing as worth considering (`pricing_model: "flat_recurring_subscription"`).
 
-The exact-fit eval suite also contains a downstream provider-validation handoff guard and a budget-gated negative case. AICO should win when the prompt asks it to shortlist first and build a provider-validation handoff checklist so the next agent can check `current_airfare`, `available_rooms`, `provider_rates`, and `taxes_and_fees` after AICO shortlists the destination; it should still route away when the buyer requires live airfare, room availability, or provider-backed hotel prices before choosing. If the remaining paid-tool budget is below the AICO primitive-chain cost, the buyer-agent should return `decision: decline_paid_tool_budget_too_low`, `blocked_reason: tool_budget_below_cost`, `budget_decline_cases: 1`, spend no AICO primitive calls, and keep `api_was_worth_spending_budget: false` instead of over-selling Builder.
+The exact-fit eval suite also contains a downstream provider-validation handoff guard and a budget-gated negative case. AICO should win when the prompt asks it to shortlist first and build a provider-validation handoff checklist so the next agent can check `current_airfare`, `available_rooms`, `provider_rates`, and `taxes_and_fees` after AICO shortlists the destination; it should still route away when the buyer requires live airfare, room availability, or provider-backed hotel prices before choosing. If the remaining paid-tool budget is below the AICO primitive-chain cost, the buyer-agent should return `decision: decline_paid_tool_budget_too_low`, `blocked_reason: tool_budget_below_cost`, `budget_decline_cases: 1`, spend no AICO primitive calls, and keep `api_was_worth_spending_budget: false` instead of over-selling the paid path.
 
 Minimal `travel.plan.validate` JSON-RPC shape:
 
@@ -230,7 +230,7 @@ The primitive proof chain should run activation → intent parse → destination
 It should accept user_request, origin, departure_window, trip_length_days, budget_usd, destination_constraints, required_themes, strict_mode, interests, and optional services.
 Treat the API as source-tiered destination search/validation plus live hotel/place discovery signals where available, not booking inventory, live flight fares, provider-backed rates, room availability, provider-backed quotes, or booking rails.
 Inspect interpreted_constraints, constraint_conflicts, confidence, unsupported_constraints, booking_readiness, bookability_status, provider_handoffs, provenance/source_tiers, live_signals, plan_validation.candidate_intent_coherence, commercial_next_step, and truth_boundaries before generating final user-facing recommendations.
-If commercial_next_step is present, surface it only after first value as a Builder-limit handoff with paid signup/login URLs and checkout source attribution; do not imply Builder unlocks live booking inventory, provider-backed rates, live flight fares, or booking support. If the operator wants Builder/Hobby limits, call POST /api/v1/commercial/intent with the same request_id and source path to record commercial_intent_requested before browser-authenticated billing; expect requires_browser_billing_account until a safe billing bridge exists. If the API is missing a primitive this app would pay to use, call POST /api/v1/api-requests with the concrete problem and expected inputs/outputs so AICO can classify it under agent_requested_api with conditional $100 usage-credit eligibility if AICO builds the requested primitive.
+If commercial_next_step is present, surface it only after first value as a Hobby flat-recurring handoff with paid signup/login URLs and checkout source attribution; do not imply Hobby unlocks live booking inventory, provider-backed rates, live flight fares, or booking support. If the operator wants Hobby $5/mo flat recurring subscription limits (`pricing_model: "flat_recurring_subscription"`), call POST /api/v1/commercial/intent with the same request_id and source path to record commercial_intent_requested before browser-authenticated billing; expect requires_browser_billing_account until a safe billing bridge exists. If the API is missing a primitive this app would pay to use, call POST /api/v1/api-requests with the concrete problem and expected inputs/outputs so AICO can classify it under agent_requested_api with conditional $100 usage-credit eligibility if AICO builds the requested primitive.
 Use ranked results and handoff fields as decision support before itinerary generation or provider fanout.
 If the API is missing a field needed by this app, record the missing field as product feedback rather than pretending the response is live booking inventory.
 ```
@@ -238,12 +238,12 @@ If the API is missing a field needed by this app, record the missing field as pr
 ## Pricing
 
 - Free sandbox via one-request activation or signup
-- Builder/Hobby plan: $5/mo flat recurring subscription via self-serve Stripe Checkout
+- Hobby plan: $5/mo flat recurring subscription via self-serve Stripe Checkout (`pricing_model: "flat_recurring_subscription"`)
 
 ## Revenue path for builders
 
 1. Activate a sandbox key or sign up and create an API key.
 2. Run the quickstart once.
 3. Add the TypeScript wrapper as one tool in your travel agent.
-4. If the response shape saves glue code or provider calls, inspect `commercial_next_step` and upgrade to Builder when sandbox limits matter. Call `POST /api/v1/commercial/intent` from API-key context first if you want the paid-intent event attributed to the first-value request; current shell-only activation accounts still use browser signup/login for billing. The commercial handoff is not a provider booking flow.
+4. If the response shape saves glue code or provider calls, inspect `commercial_next_step` and upgrade to Hobby when sandbox limits matter (`pricing_model: "flat_recurring_subscription"`). Call `POST /api/v1/commercial/intent` from API-key context first if you want the paid-intent event attributed to the first-value request; current shell-only activation accounts still use browser signup/login for billing. The commercial handoff is not a provider booking flow.
 5. If one field or destination blocks adoption, open an issue or reply through the channel where you found this repo.

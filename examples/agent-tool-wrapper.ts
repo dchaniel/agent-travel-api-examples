@@ -108,8 +108,9 @@ type AgentTravelResponse = {
 };
 
 type CommercialNextStep = {
+  pricing_model?: "flat_recurring_subscription" | string;
   reason: "coherent_first_value_or_provider_handoff_ready" | string;
-  recommended_plan: "builder" | string;
+  recommended_plan: "hobby" | string;
   paid_signup_url: string;
   paid_login_url: string;
   billing_url_after_login: string;
@@ -641,6 +642,8 @@ export function summarizeForPlanner(response: AgentTravelResponse) {
     commercialNextStep: response.commercial_next_step
       ? {
           recommendedPlan: response.commercial_next_step.recommended_plan,
+          pricingModel: "flat_recurring_subscription",
+          pricing_model: "flat_recurring_subscription",
           paidSignupUrl: response.commercial_next_step.paid_signup_url,
           paidLoginUrl: response.commercial_next_step.paid_login_url,
           checkoutSourcePath: response.commercial_next_step.checkout_source_path,
@@ -649,7 +652,7 @@ export function summarizeForPlanner(response: AgentTravelResponse) {
           requiresBrowserBillingAccount: true,
           truthBoundaries: response.commercial_next_step.truth_boundaries,
           note:
-            "Surface this only after first value. Builder increases limits for production-shaped testing; it does not add live booking inventory, provider-backed rates, live flight fares, or booking support.",
+            "Surface this only after first value. Hobby is a $5/mo flat recurring subscription (`pricing_model: \"flat_recurring_subscription\"`) for production-shaped testing; it does not add live booking inventory, provider-backed rates, live flight fares, or booking support.",
         }
       : null,
     requiredExternalChecks:
