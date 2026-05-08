@@ -570,7 +570,9 @@ export async function validateTravelPlan(input: ValidateTravelPlanInput): Promis
   return callHostedMcpTool<PlanValidationPrimitiveResponse>("travel.plan.validate", input, "plan-validate-1");
 }
 
-export async function generateProviderHandoffs(input: SearchTravelInput): Promise<ProviderHandoffPrimitiveResponse> {
+export async function generateProviderHandoffs(
+  input: SearchTravelInput & { selected_candidate?: { id?: string; name?: string } },
+): Promise<ProviderHandoffPrimitiveResponse> {
   if (!input.user_request) {
     throw new Error("travel.provider_handoffs.generate requires user_request so handoff setup preserves the user's hard scope.");
   }
@@ -746,7 +748,10 @@ async function examplePrimitiveChain() {
     return { intent, destinations, livePlaces, validation, decision: "revise_candidate_before_provider_fanout" };
   }
 
-  const handoffs = await generateProviderHandoffs(input);
+  const handoffs = await generateProviderHandoffs({
+    ...input,
+    selected_candidate: { id: selected.id, name: selected.name },
+  });
   return { intent, destinations, livePlaces, validation, handoffs, decision: "execute_provider_handoffs" };
 }
 
