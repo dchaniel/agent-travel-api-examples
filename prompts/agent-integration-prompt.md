@@ -39,9 +39,9 @@ Treat the API as source-tiered destination search/validation plus live place dis
 
 Inspect interpreted_constraints, constraint_conflicts, confidence, unsupported_constraints, booking_readiness, bookability_status, provider_handoffs, provenance/source_tiers, live_signals, live_places, plan_validation.candidate_intent_coherence, commercial_next_step, and truth_boundaries before generating final user-facing recommendations.
 
-If commercial_next_step is present, surface it only after first value as a Hobby flat-recurring handoff with paid signup/login URLs and checkout source attribution. Do not imply Hobby unlocks live booking inventory, provider-backed rates, live flight fares, room availability, taxes/fees validation, checkout availability, or booking support.
+If commercial_next_step is present, surface it only after first value as a usage-token minimum handoff with paid signup/login URLs and checkout source attribution. Do not imply paid access unlocks live booking inventory, provider-backed rates, live flight fares, room availability, taxes/fees validation, checkout availability, or booking support.
 
-If the operator wants Hobby $5/mo flat recurring subscription limits (`pricing_model: "flat_recurring_subscription"`), call POST /api/v1/commercial/intent with the same request_id and source_path /api/v1/travel/search/commercial-next-step to record commercial_intent_requested from API-key context before browser-authenticated billing. Expect requires_browser_billing_account until a safe billing bridge exists.
+If the operator wants higher usage-token minimum limits (`pricing_model: "usage_token_minimum"`; Hobby: $5 minimum usage/month with $5 credits included; Pro: $20 minimum usage/month with $20 credits included), call POST /api/v1/commercial/intent with the same request_id and source_path /api/v1/travel/search/commercial-next-step to record commercial_intent_requested from API-key context before browser-authenticated billing. Expect requires_browser_billing_account until a safe billing bridge exists.
 
 Use ranked results and handoff fields as decision support before itinerary generation or provider fanout.
 

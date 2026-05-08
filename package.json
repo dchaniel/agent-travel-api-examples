@@ -1,0 +1,23 @@
+{
+  "name": "agent-travel-api-examples",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Public examples and copy-paste wrappers for Agent Infrastructure Co Agent Travel API.",
+  "type": "module",
+  "scripts": {
+    "test": "node tests/public-proof.test.mjs"
+  },
+  "keywords": [
+    "ai-agents",
+    "openapi",
+    "travel-api",
+    "mcp",
+    "agent-infrastructure"
+  ],
+  "homepage": "https://agentinfrastructureco.com/docs",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dchaniel/agent-travel-api-examples.git"
+  },
+  "license": "MIT"
+}
