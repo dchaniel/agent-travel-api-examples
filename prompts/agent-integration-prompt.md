@@ -29,7 +29,7 @@ Add MCP primitive wrappers when the planner already has live provider integratio
 Run the primitive proof chain before provider fanout:
 activation → travel.intent.parse → travel.destinations.search → travel.places.search → travel.plan.validate → travel.provider_handoffs.generate.
 
-The current public proof validates Point Reyes + Sonoma Coast for an autumn SFO hiking/food prompt. It should inspect live_places evidence, assert plan_validation.candidate_intent_coherence before provider fanout, then execute provider_handoffs only for coherent candidates while preserving live_flight_fares: false, live_booking_inventory: false, and provider_backed_rates: false.
+The current public proof validates Point Reyes + Sonoma Coast for an autumn SFO hiking/food prompt. It should inspect live_places evidence, assert plan_validation.candidate_intent_coherence before provider fanout, then execute provider_handoffs only for coherent candidates while preserving live_flight_fares: false, live_booking_inventory: false, and provider_backed_rates: false. For strict arbitrary destinations with weak coverage, pass live_research_mode/max_live_research_ms and branch on research_status/poll_url; research_pending should be polled at /api/v1/travel/research/jobs/{id} instead of substituting an off-scope candidate.
 
 If google_aggregator_signals, aggregator_fare_snapshots, or hotel_rate_snapshots appear, treat them as AICO-operated provider-search setup/handoff evidence only. They are not live airfare, provider-backed hotel rates, room availability, taxes/fees validation, booking inventory, checkout availability, or a booking rail.
 
@@ -37,7 +37,7 @@ The suite also has a budget-gated negative case: if the remaining paid-tool budg
 
 Treat the API as source-tiered destination search/validation plus live place discovery signals where available. It is not booking inventory, live flight fares, provider-backed hotel rates, room availability, provider-backed quotes, taxes/fees validation, checkout availability, or a booking rail.
 
-Inspect interpreted_constraints, constraint_conflicts, confidence, unsupported_constraints, booking_readiness, bookability_status, provider_handoffs, provenance/source_tiers, live_signals, live_places, plan_validation.candidate_intent_coherence, commercial_next_step, and truth_boundaries before generating final user-facing recommendations.
+Inspect interpreted_constraints, constraint_conflicts, confidence, unsupported_constraints, booking_readiness, bookability_status, provider_handoffs, provenance/source_tiers, live_signals, live_places, research_status, poll_url, plan_validation.candidate_intent_coherence, commercial_next_step, and truth_boundaries before generating final user-facing recommendations.
 
 If commercial_next_step is present, surface it only after first value as a usage-token minimum handoff with paid signup/login URLs and checkout source attribution. Do not imply paid access unlocks live booking inventory, provider-backed rates, live flight fares, room availability, taxes/fees validation, checkout availability, or booking support.
 

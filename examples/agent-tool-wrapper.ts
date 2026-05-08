@@ -15,6 +15,8 @@ type SearchTravelInput = {
   strict_mode?: boolean;
   interests: string[];
   services?: string[];
+  live_research_mode?: "off" | "bounded" | "async_only";
+  max_live_research_ms?: number;
 };
 
 type AicoPrimitiveChainBudgetGate = {
@@ -103,6 +105,8 @@ type AgentTravelResponse = {
   beta_warnings: string[];
   interpreted_constraints?: Record<string, unknown>;
   constraint_conflicts?: Array<Record<string, unknown>>;
+  research_status?: "research_ready" | "research_pending" | "research_partial" | string;
+  poll_url?: string;
   results: AgentTravelResult[];
   commercial_next_step?: CommercialNextStep | null;
 };
@@ -617,7 +621,12 @@ export function summarizeForPlanner(response: AgentTravelResponse) {
       decision: "ask_for_more_constraints_or_handoff_to_live_search",
       interpretedConstraints: response.interpreted_constraints,
       constraintConflicts: response.constraint_conflicts ?? [],
-      summary: "No in-scope destination returned; ask for clearer constraints or hand off to live search/provider tools.",
+      researchStatus: response.research_status,
+      pollUrl: response.poll_url,
+      summary:
+        response.research_status === "research_pending"
+          ? "Research is pending; poll /api/v1/travel/research/jobs/{id} via the returned URL before provider fanout instead of substituting an off-scope destination."
+          : "No in-scope destination returned; ask for clearer constraints or hand off to live search/provider tools.",
     };
   }
 
@@ -641,6 +650,8 @@ export function summarizeForPlanner(response: AgentTravelResponse) {
     sourceTiers: top.source_tiers,
     liveSignalsSource: top.live_signals?.source,
     bookabilityStatus: top.bookability_status ?? top.provider_handoffs?.bookability_status,
+    researchStatus: response.research_status,
+    pollUrl: response.poll_url,
     commercialNextStep: response.commercial_next_step
       ? {
           recommendedPlan: response.commercial_next_step.recommended_plan,
@@ -682,6 +693,8 @@ async function example() {
     strict_mode: true,
     interests: ["hiking", "food", "recovery"],
     services: ["flights", "stays", "weather", "research"],
+    live_research_mode: "bounded",
+    max_live_research_ms: 750,
   });
 
   return summarizeForPlanner(ranked);
@@ -707,6 +720,8 @@ async function examplePrimitiveChain() {
     budget_usd: 4500,
     interests: ["hiking", "food"],
     services: ["flights", "stays", "research"],
+    live_research_mode: "bounded",
+    max_live_research_ms: 750,
     strict_mode: true,
   };
 

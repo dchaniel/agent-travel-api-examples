@@ -6,7 +6,7 @@ Public quickstarts for integrating Agent Travel API into AI travel agents, itine
 
 Agent Travel API is an agent-native travel search and validation API built for AI agents.
 
-One API call turns a messy trip prompt plus optional hard constraints into source-aware destination JSON with interpreted constraints, conflict handling, ranking breakdowns, beta warnings, confidence, unsupported constraints, provenance, live hotel/place discovery signals where available, and provider-ready handoffs. Hosted MCP also exposes the current validated primitive proof chain — `travel.intent.parse` → `travel.destinations.search` → `travel.places.search` → `travel.plan.validate` → `travel.provider_handoffs.generate` — for agents that want to parse intent, gate candidates, inspect branchable `live_places` evidence, validate a proposed plan/candidate, and prepare provider handoffs without forcing every step through one ranked itinerary response.
+One API call turns a messy trip prompt plus optional hard constraints into source-aware destination JSON with interpreted constraints, conflict handling, ranking breakdowns, beta warnings, confidence, unsupported constraints, provenance, live hotel/place discovery signals where available, provider-ready handoffs, and anywhere-research status controls (`live_research_mode`, `max_live_research_ms`, `research_status`, `poll_url`). Hosted MCP also exposes the current validated primitive proof chain — `travel.intent.parse` → `travel.destinations.search` → `travel.places.search` → `travel.plan.validate` → `travel.provider_handoffs.generate` — for agents that want to parse intent, gate candidates, inspect branchable `live_places` evidence, validate a proposed plan/candidate, and prepare provider handoffs without forcing every step through one ranked itinerary response.
 
 Human developers are the operators and economic buyers, but agents are the core audience: the API is meant to be easy for an agent to discover, understand, activate, call, and evaluate.
 
@@ -73,7 +73,9 @@ curl https://agentinfrastructureco.com/api/v1/travel/search \
     "required_themes": ["redwoods", "rugged coast"],
     "strict_mode": true,
     "interests": ["hiking", "food", "recovery"],
-    "services": ["flights", "stays", "weather", "research"]
+    "services": ["flights", "stays", "weather", "research"],
+    "live_research_mode": "bounded",
+    "max_live_research_ms": 750
   }'
 ```
 
@@ -86,6 +88,7 @@ Each result exposes trust fields an agent should inspect before writing user-fac
 - `unsupported_constraints`: constraints the beta could not fully verify
 - `booking_readiness` and `bookability_status`: whether the result is rankable now or must be handed to live providers before purchase decisions
 - `provider_handoffs`: flight, hotel, and place validation tasks/params for the next provider call
+- `research_status` and `poll_url`: strict arbitrary-destination research lifecycle; small bounded budgets can return `research_pending` with `/api/v1/travel/research/jobs/{id}` instead of off-scope fallback
 - `live_signals`: source, retrieval time, hotel/place candidates, coverage flags, and limitations
 - `provenance` / `source_tiers`: whether evidence is `curated_baseline`, `model_estimate`, `live_places`, `handoff_required`, or unsupported
 - `commercial_next_step`: when present, Hobby paid signup/login URLs plus `checkout_source_path: "/api/v1/travel/search/commercial-next-step"`, source attribution, limit deltas, and explicit truth boundaries that keep live booking inventory, provider-backed rates, live flight fares, and booking support false
@@ -94,7 +97,7 @@ Each result exposes trust fields an agent should inspect before writing user-fac
 
 See [`examples/agent-tool-wrapper.ts`](examples/agent-tool-wrapper.ts) for copy-pasteable wrappers that an AI coding agent can drop into a travel-planning app.
 
-The wrapper includes `activateAicoSandbox()` for `POST /api/v1/activation`; store the returned key immediately in `AICO_TRAVEL_KEY` or your secret manager and never log it. The wrapper intentionally returns the trust, handoff, and commercial-next-step fields, not only the destination name and score. In the primitive-chain example, the already validated `selected_candidate` is passed into `travel.provider_handoffs.generate` so downstream Expedia/Marriott/Amadeus/browser-provider calls stay tied to the same candidate that passed live-place and plan-validation checks. Agents should read `interpreted_constraints`, `confidence`, `unsupported_constraints`, `booking_readiness`, `bookability_status`, `provider_handoffs`, `live_signals.coverage`, and `commercial_next_step` before deciding whether to ask a booking/search provider for live inventory or route the operator toward Hobby limits. If `commercial_next_step` is useful, call the wrapper's `recordCommercialIntent()` helper to record `commercial_intent_requested` from API-key context before browser-authenticated billing.
+The wrapper includes `activateAicoSandbox()` for `POST /api/v1/activation`; store the returned key immediately in `AICO_TRAVEL_KEY` or your secret manager and never log it. The wrapper intentionally returns the trust, handoff, research-status, and commercial-next-step fields, not only the destination name and score. In the primitive-chain example, the already validated `selected_candidate` is passed into `travel.provider_handoffs.generate` so downstream Expedia/Marriott/Amadeus/browser-provider calls stay tied to the same candidate that passed live-place and plan-validation checks. Agents should read `interpreted_constraints`, `confidence`, `unsupported_constraints`, `booking_readiness`, `bookability_status`, `provider_handoffs`, `research_status`, `poll_url`, `live_signals.coverage`, and `commercial_next_step` before deciding whether to ask a booking/search provider for live inventory or route the operator toward Hobby limits. If `commercial_next_step` is useful, call the wrapper's `recordCommercialIntent()` helper to record `commercial_intent_requested` from API-key context before browser-authenticated billing.
 
 ## Agent Commerce / Used Goods deal validation
 
@@ -227,7 +230,7 @@ Add MCP primitive wrappers when the planner already has live provider integratio
 - validateTravelPlan → hosted MCP `travel.plan.validate`
 - generateProviderHandoffs → hosted MCP `travel.provider_handoffs.generate`
 The primitive proof chain should run activation → intent parse → destination/no-match gate → live places evidence → plan validation → provider handoff. It should reject or revise stale candidates before provider fanout; the current proof validates Point Reyes + Sonoma Coast for an autumn SFO hiking/food prompt.
-It should accept user_request, origin, departure_window, trip_length_days, budget_usd, destination_constraints, required_themes, strict_mode, interests, and optional services.
+It should accept user_request, origin, departure_window, trip_length_days, budget_usd, destination_constraints, required_themes, strict_mode, interests, optional services, and optional anywhere-research controls live_research_mode/max_live_research_ms. For strict arbitrary destinations with weak coverage, prefer research_status: research_pending plus poll_url and /api/v1/travel/research/jobs/{id} over off-scope fallback.
 Treat the API as source-tiered destination search/validation plus live hotel/place discovery signals where available, not booking inventory, live flight fares, provider-backed rates, room availability, provider-backed quotes, or booking rails.
 Inspect interpreted_constraints, constraint_conflicts, confidence, unsupported_constraints, booking_readiness, bookability_status, provider_handoffs, provenance/source_tiers, live_signals, plan_validation.candidate_intent_coherence, commercial_next_step, and truth_boundaries before generating final user-facing recommendations.
 If commercial_next_step is present, surface it only after first value as a usage-token minimum handoff with paid signup/login URLs and checkout source attribution; do not imply paid access unlocks live booking inventory, provider-backed rates, live flight fares, or booking support. If the operator wants higher usage-token minimum limits (`pricing_model: "usage_token_minimum"`; Hobby: $5 minimum usage/month with $5 credits included; Pro: $20 minimum usage/month with $20 credits included), call POST /api/v1/commercial/intent with the same request_id and source path to record commercial_intent_requested before browser-authenticated billing; expect requires_browser_billing_account until a safe billing bridge exists. If the API is missing a primitive this app would pay to use, call POST /api/v1/api-requests with the concrete problem and expected inputs/outputs so AICO can classify it under agent_requested_api with conditional $100 usage-credit eligibility if AICO builds the requested primitive.
